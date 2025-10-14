@@ -21,12 +21,7 @@ class Server:
     def run(self):
         self.logger.separator()
         self.logger.info("Server is running and waiting for connections.")
-        try:
-            while True:
-                conn, addr = self.socket.accept()
-                self.logger.info(f"New connection from {addr}")
-                threading.Thread(target=self.handle_client, args=(conn, addr), daemon=True).start()
-        except KeyboardInterrupt:
-            self.logger.info("KeyboardInterrupt received. Shutting down server gracefully...")
-            self.socket.close()
-            exit(0)
+        while True:
+            conn, addr = self.socket.accept()
+            self.logger.info(f"New connection from {addr}")
+            threading.Thread(target=self.handle_client, args=(conn, addr), daemon=True).start()
