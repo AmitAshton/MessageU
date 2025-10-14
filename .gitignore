@@ -1,0 +1,10 @@
+venv/
+.idea/
+.DS_Store
+Thumbs.db__pycache__/
+*.pyc
+server.log
+
+*.obj
+*.pdb
+*.dll
