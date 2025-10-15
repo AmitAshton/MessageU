@@ -1,12 +1,23 @@
-from protocol.header import RequestHeader, ResponseHeader
-from protocol.enums import RequestCode, ResponseCode, ProtocolVersion
+import pytest
 import uuid
+from protocol.builder import ResponseBuilder
+from protocol.parser import RequestParser
 
-cid = uuid.uuid4()
-req = RequestHeader(cid, ProtocolVersion.CLIENT, RequestCode.REGISTER, 415)
-data = req.to_bytes()
-parsed = RequestHeader.from_bytes(data)
-print(parsed.client_id, parsed.version, parsed.code, parsed.payload_size)
 
-res = ResponseHeader(ProtocolVersion.SERVER, ResponseCode.GENERAL_ERROR, 0)
-print(res.to_bytes())
+def test_response_builder_register_success():
+    uid = uuid.uuid4()
+    data = ResponseBuilder.build_register_success(uid)
+    assert uid.bytes in data
+    assert isinstance(data, bytes)
+
+def test_parse_invalid_header_length():
+    bad = b"\x00" * 5
+    with pytest.raises(Exception):
+        RequestParser.parse(bad)
+
+def test_invalid_request_code_parsing():
+    uid = uuid.uuid4().bytes
+    invalid_code = (9999).to_bytes(2, "little")
+    header_bytes = uid + b"\x02" + invalid_code + b"\x10\x00\x00\x00"
+    with pytest.raises(Exception):
+        RequestParser.parse(header_bytes)

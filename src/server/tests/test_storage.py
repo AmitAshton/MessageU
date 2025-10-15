@@ -1,58 +1,35 @@
+import os
 from storage.db_manager import DatabaseManager
 from models.client import ClientRecord
 from models.message import MessageRecord
-import os
+from protocol.enums import MessageType
 
 
-def reset_db(path="defensive.db"):
-    """Deletes the existing DB for a clean test run"""
-    if os.path.exists(path):
-        os.remove(path)
+def test_create_tables_and_insert(db: DatabaseManager):
+    c = ClientRecord("TestUser", b"PubKey")
+    db.add_client(c)
+    result = db.get_client_by_username("TestUser")
+    assert result.username == "TestUser"
 
-
-def test_database_operations():
-    reset_db()
-    db = DatabaseManager("defensive.db")
-
-    # --- Create and add clients ---
-    alice = ClientRecord("Alice", b"alice_public_key")
-    bob = ClientRecord("Bob", b"bob_public_key")
-
-    db.add_client(alice)
-    db.add_client(bob)
-
-    print("=== Clients added ===")
-    for client in db.list_clients():
-        print(client.to_dict())
-
-    # --- Retrieve clients ---
-    retrieved = db.get_client_by_username("Alice")
-    print("\nRetrieved Alice:", retrieved.to_dict())
-
-    retrieved_by_id = db.get_client_by_id(bob.id)
-    print("\nRetrieved Bob by ID:", retrieved_by_id.to_dict())
-
-    # --- Send a message ---
-    msg = MessageRecord(
-        to_client=bob.id,
-        from_client=alice.id,
-        msg_type=3,
-        content=b"Encrypted message from Alice"
-    )
-
+def test_message_storage_and_retrieval(db: DatabaseManager):
+    c1 = ClientRecord("Alice", b"k1")
+    c2 = ClientRecord("Bob", b"k2")
+    db.add_client(c1)
+    db.add_client(c2)
+    msg = MessageRecord(c2.id, c1.id, MessageType.TEXT_MESSAGE, b"payload")
     db.save_message(msg)
-    print("\nMessage saved:", msg.to_dict())
-
-    # --- Fetch pending messages for Bob ---
-    pending = db.get_pending_messages(bob.id)
-    print("\nPending messages for Bob:")
-    for p in pending:
-        print(p.to_dict())
-
-    # --- Delete the message ---
+    found = db.get_pending_messages(c2.id)
+    assert len(found) == 1
     db.delete_message(msg.id)
-    print("\nAfter deletion, Bob’s pending messages:", db.get_pending_messages(bob.id))
+    assert len(db.get_pending_messages(c2.id)) == 0
 
+def test_injection_protection(db: DatabaseManager):
+    dangerous_name = "Evil'; DROP TABLE clients; --"
+    c = ClientRecord(dangerous_name, b"k")
+    db.add_client(c)
+    assert db.get_client_by_username(dangerous_name).username == dangerous_name
 
-if __name__ == "__main__":
-    test_database_operations()
+def test_missing_db_file(tmp_path):
+    db_path = tmp_path / "nonexistent.db"
+    db = DatabaseManager(str(db_path))
+    assert os.path.exists(db_path)

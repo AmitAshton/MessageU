@@ -5,17 +5,24 @@ from models.message import MessageRecord
 from datetime import datetime
 import uuid
 import os
+import threading
 
 class DatabaseManager:
+    """Thread-safe SQLite database manager with clean teardown."""
+
     def __init__(self, db_path: str = "defensive.db"):
         self.db_path = db_path
+        self._lock = threading.Lock()
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._ensure_database()
 
-    def _ensure_database(self):
-        """Create database and tables if they don't exist"""
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True) if os.path.dirname(self.db_path) else None
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+    # ---------- Initialization ----------
+    def _ensure_database(self) -> None:
+        """Create database tables if they do not exist."""
+        if os.path.dirname(self.db_path):
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        with self._lock:
+            self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS clients (
                     id TEXT PRIMARY KEY,
                     username TEXT UNIQUE,
@@ -23,7 +30,7 @@ class DatabaseManager:
                     last_seen TEXT
                 )
             """)
-            conn.execute("""
+            self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     id TEXT PRIMARY KEY,
                     to_client TEXT,
@@ -32,20 +39,23 @@ class DatabaseManager:
                     content TEXT
                 )
             """)
-            conn.commit()
+            self.conn.commit()
 
-    # ---------- CLIENTS ----------
+    # ---------- Client Management ----------
     def add_client(self, client: ClientRecord) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "INSERT INTO clients (id, username, public_key, last_seen) VALUES (?, ?, ?, ?)",
-                (str(client.id), client.username, client.public_key.hex(), client.last_seen.isoformat())
-            )
-            conn.commit()
+        with self._lock:
+            try:
+                self.conn.execute(
+                    "INSERT INTO clients (id, username, public_key, last_seen) VALUES (?, ?, ?, ?)",
+                    (str(client.id), client.username, client.public_key.hex(), client.last_seen.isoformat())
+                )
+                self.conn.commit()
+            except sqlite3.IntegrityError as e:
+                raise ValueError(f"Client with username '{client.username}' already exists") from e
 
     def get_client_by_username(self, username: str) -> Optional[ClientRecord]:
-        with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
+        with self._lock:
+            row = self.conn.execute(
                 "SELECT id, username, public_key, last_seen FROM clients WHERE username = ?", (username,)
             ).fetchone()
             if not row:
@@ -55,8 +65,8 @@ class DatabaseManager:
             return c
 
     def get_client_by_id(self, client_id: uuid.UUID) -> Optional[ClientRecord]:
-        with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute(
+        with self._lock:
+            row = self.conn.execute(
                 "SELECT id, username, public_key, last_seen FROM clients WHERE id = ?", (str(client_id),)
             ).fetchone()
             if not row:
@@ -66,8 +76,8 @@ class DatabaseManager:
             return c
 
     def list_clients(self) -> List[ClientRecord]:
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute("SELECT id, username, public_key, last_seen FROM clients").fetchall()
+        with self._lock:
+            rows = self.conn.execute("SELECT id, username, public_key, last_seen FROM clients").fetchall()
             clients = []
             for row in rows:
                 c = ClientRecord(row[1], bytes.fromhex(row[2]), uuid.UUID(row[0]))
@@ -75,10 +85,10 @@ class DatabaseManager:
                 clients.append(c)
             return clients
 
-    # ---------- MESSAGES ----------
+    # ---------- Message Management ----------
     def save_message(self, message: MessageRecord) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
+        with self._lock:
+            self.conn.execute(
                 "INSERT INTO messages (id, to_client, from_client, msg_type, content) VALUES (?, ?, ?, ?, ?)",
                 (
                     str(message.id),
@@ -88,11 +98,11 @@ class DatabaseManager:
                     message.content.hex(),
                 ),
             )
-            conn.commit()
+            self.conn.commit()
 
     def get_pending_messages(self, client_id: uuid.UUID) -> List[MessageRecord]:
-        with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute(
+        with self._lock:
+            rows = self.conn.execute(
                 "SELECT id, to_client, from_client, msg_type, content FROM messages WHERE to_client = ?",
                 (str(client_id),),
             ).fetchall()
@@ -110,6 +120,23 @@ class DatabaseManager:
             return messages
 
     def delete_message(self, message_id: uuid.UUID) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("DELETE FROM messages WHERE id = ?", (str(message_id),))
-            conn.commit()
+        with self._lock:
+            self.conn.execute("DELETE FROM messages WHERE id = ?", (str(message_id),))
+            self.conn.commit()
+
+    # ---------- Utilities ----------
+    def clear_all(self) -> None:
+        """Delete all data (used for tests)."""
+        with self._lock:
+            self.conn.execute("DELETE FROM clients")
+            self.conn.execute("DELETE FROM messages")
+            self.conn.commit()
+
+    def close(self):
+        """Safely close database connection."""
+        with self._lock:
+            try:
+                self.conn.commit()
+                self.conn.close()
+            except Exception:
+                pass

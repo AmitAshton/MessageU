@@ -1,7 +1,9 @@
 from utils.config_loader import ConfigLoader
 from utils.logger import ServerLogger
+from handler import RequestHandler
 import socket
 import threading
+
 
 class Server:
     def __init__(self):
@@ -12,11 +14,12 @@ class Server:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.host, self.port))
         self.socket.listen(5)
-        self.logger.info(f"Server started on port {self.port}")
+        self.logger.info(f"Server (v{self.config.version}) started on port {self.port}")
 
     def handle_client(self, conn, addr):
         self.logger.info(f"New connection from {addr}")
-        conn.close()
+        handler = RequestHandler(conn, addr)
+        handler.process()
 
     def run(self):
         self.logger.separator()
@@ -24,4 +27,5 @@ class Server:
         while True:
             conn, addr = self.socket.accept()
             self.logger.info(f"New connection from {addr}")
-            threading.Thread(target=self.handle_client, args=(conn, addr), daemon=True).start()
+            thread = threading.Thread(target=self.handle_client, args=(conn, addr), daemon=True)
+            thread.start()

@@ -6,12 +6,13 @@ class ConfigLoader:
     DEFAULT_LOG_PATH = "server.log"
     SERVER_VERSION = 2
 
-    def __init__(self, config_file="myport.info"):
-        self.config_file = config_file
-        self.port = self._load_port()
-        self.db_path = self.DEFAULT_DB_PATH
-        self.log_path = self.DEFAULT_LOG_PATH
+    def __init__(self, config_file="myport.info", base_path=None):
+        base_path = base_path or os.getcwd()
+        self.config_file = os.path.join(base_path, config_file)
+        self.db_path = os.path.join(base_path, self.DEFAULT_DB_PATH)
+        self.log_path = os.path.join(base_path, self.DEFAULT_LOG_PATH)
         self.version = self.SERVER_VERSION
+        self.port = self._load_port()
 
     def _load_port(self) -> int:
         if os.path.exists(self.config_file):

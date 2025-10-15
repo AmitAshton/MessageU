@@ -1,7 +1,7 @@
 import struct
 import uuid
-from header import ResponseHeader
-from enums import ResponseCode, ProtocolVersion
+from .header import ResponseHeader
+from .enums import ResponseCode, ProtocolVersion
 
 class ResponseBuilder:
     @staticmethod

@@ -1,12 +1,14 @@
-from header import RequestHeader
-from payload import PayloadParser
-from enums import RequestCode
+from .header import RequestHeader
+from .payload import PayloadParser
+from .enums import RequestCode
 
 class RequestParser:
     @staticmethod
     def parse(data: bytes):
         header = RequestHeader.from_bytes(data[:RequestHeader.SIZE])
         payload = data[RequestHeader.SIZE : RequestHeader.SIZE + header.payload_size]
+        if header.code not in [e.value for e in RequestCode]:
+            raise ValueError(f"Invalid request code: {header.code}")
         return header, RequestParser._parse_payload(header.code, payload)
 
     @staticmethod
