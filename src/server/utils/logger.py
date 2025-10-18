@@ -8,9 +8,10 @@ class ServerLogger:
 
     def __new__(cls, log_file="server.log"):
         with cls._lock:
-            instance = super(ServerLogger, cls).__new__(cls)
-            instance._initialize(log_file)
-            return instance
+            if cls._instance is None:
+                cls._instance = super(ServerLogger, cls).__new__(cls)
+                cls._instance._initialize(log_file)
+        return cls._instance
 
     def _initialize(self, log_file):
         self.log_file = log_file
@@ -18,74 +19,48 @@ class ServerLogger:
         if dir_name:
             os.makedirs(dir_name, exist_ok=True)
 
-        # Always create and close immediately so the file exists
-        with open(log_file, "a") as f:
-            f.write("")
-        os.utime(log_file, None)
+        self.logger = logging.getLogger("MessageUServer")
+        if not self.logger.handlers:  # prevent duplication
+            self.logger.setLevel(logging.DEBUG)
+            fmt = logging.Formatter("%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s")
 
-        self.logger = logging.getLogger(f"MessageUServer_{id(self)}")
-        self.logger.setLevel(logging.DEBUG)
-        self.logger.handlers.clear()
+            file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8", delay=False)
+            stream_handler = logging.StreamHandler()
 
-        fh = logging.FileHandler(log_file, mode="a", encoding="utf-8", delay=False)
-        sh = logging.StreamHandler()
-        fmt = logging.Formatter("%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s")
-        fh.setFormatter(fmt)
-        sh.setFormatter(fmt)
-        self.logger.addHandler(fh)
-        self.logger.addHandler(sh)
+            file_handler.setFormatter(fmt)
+            stream_handler.setFormatter(fmt)
 
-        self._force_flush_close_open()
+            self.logger.addHandler(file_handler)
+            self.logger.addHandler(stream_handler)
 
-    def _force_flush_close_open(self):
-        """Force-create and release file handle for immediate visibility on Windows."""
-        for h in list(self.logger.handlers):
-            if isinstance(h, logging.FileHandler):
-                h.flush()
-                h.close()
-        # Reopen a fresh handler so logging continues safely
-        fh = logging.FileHandler(self.log_file, mode="a", encoding="utf-8", delay=False)
-        fmt = logging.Formatter("%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s")
-        fh.setFormatter(fmt)
-        self.logger.addHandler(fh)
-
-    def _ensure_file(self):
-        if not os.path.exists(self.log_file):
-            with open(self.log_file, "a") as f:
-                f.write("")
-        os.utime(self.log_file, None)
+    def _flush(self):
+        for h in self.logger.handlers:
+            h.flush()
 
     def info(self, message):
         self.logger.info(message)
-        self._force_flush_close_open()
-        self._ensure_file()
+        self._flush()
 
     def debug(self, message):
         self.logger.debug(message)
-        self._force_flush_close_open()
-        self._ensure_file()
+        self._flush()
 
     def warning(self, message):
         self.logger.warning(message)
-        self._force_flush_close_open()
-        self._ensure_file()
+        self._flush()
 
     def error(self, message):
         self.logger.error(message)
-        self._force_flush_close_open()
-        self._ensure_file()
+        self._flush()
 
     def exception(self, message):
         self.logger.exception(message)
-        self._force_flush_close_open()
-        self._ensure_file()
+        self._flush()
 
     def separator(self):
         self.logger.info("=" * 80)
-        self._force_flush_close_open()
-        self._ensure_file()
+        self._flush()
 
     def session_log(self, client_id: str, event: str, extra: str = ""):
         self.logger.info(f"[Client: {client_id}] {event} {extra}")
-        self._force_flush_close_open()
-        self._ensure_file()
+        self._flush()

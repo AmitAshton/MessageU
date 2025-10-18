@@ -8,12 +8,13 @@ import os
 import threading
 
 class DatabaseManager:
-    """Thread-safe SQLite database manager with clean teardown."""
+    """Thread-safe SQLite database manager with BLOB-based key storage."""
 
     def __init__(self, db_path: str = "defensive.db"):
         self.db_path = db_path
         self._lock = threading.Lock()
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self.conn.execute("PRAGMA foreign_keys = ON;")
         self._ensure_database()
 
     # ---------- Initialization ----------
@@ -26,7 +27,7 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS clients (
                     id TEXT PRIMARY KEY,
                     username TEXT UNIQUE,
-                    public_key TEXT,
+                    public_key BLOB,
                     last_seen TEXT
                 )
             """)
@@ -36,7 +37,7 @@ class DatabaseManager:
                     to_client TEXT,
                     from_client TEXT,
                     msg_type INTEGER,
-                    content TEXT
+                    content BLOB
                 )
             """)
             self.conn.commit()
@@ -47,7 +48,7 @@ class DatabaseManager:
             try:
                 self.conn.execute(
                     "INSERT INTO clients (id, username, public_key, last_seen) VALUES (?, ?, ?, ?)",
-                    (str(client.id), client.username, client.public_key.hex(), client.last_seen.isoformat())
+                    (str(client.id), client.username, client.public_key, client.last_seen.isoformat())
                 )
                 self.conn.commit()
             except sqlite3.IntegrityError as e:
@@ -60,7 +61,7 @@ class DatabaseManager:
             ).fetchone()
             if not row:
                 return None
-            c = ClientRecord(row[1], bytes.fromhex(row[2]), uuid.UUID(row[0]))
+            c = ClientRecord(row[1], row[2], uuid.UUID(row[0]))
             c._last_seen = datetime.fromisoformat(row[3])
             return c
 
@@ -71,7 +72,7 @@ class DatabaseManager:
             ).fetchone()
             if not row:
                 return None
-            c = ClientRecord(row[1], bytes.fromhex(row[2]), uuid.UUID(row[0]))
+            c = ClientRecord(row[1], row[2], uuid.UUID(row[0]))
             c._last_seen = datetime.fromisoformat(row[3])
             return c
 
@@ -80,7 +81,7 @@ class DatabaseManager:
             rows = self.conn.execute("SELECT id, username, public_key, last_seen FROM clients").fetchall()
             clients = []
             for row in rows:
-                c = ClientRecord(row[1], bytes.fromhex(row[2]), uuid.UUID(row[0]))
+                c = ClientRecord(row[1], row[2], uuid.UUID(row[0]))
                 c._last_seen = datetime.fromisoformat(row[3])
                 clients.append(c)
             return clients
@@ -95,7 +96,7 @@ class DatabaseManager:
                     str(message.to_client),
                     str(message.from_client),
                     message.msg_type,
-                    message.content.hex(),
+                    message.content,
                 ),
             )
             self.conn.commit()
@@ -113,7 +114,7 @@ class DatabaseManager:
                         uuid.UUID(row[1]),
                         uuid.UUID(row[2]),
                         int(row[3]),
-                        bytes.fromhex(row[4]),
+                        row[4],
                         uuid.UUID(row[0]),
                     )
                 )
@@ -126,14 +127,12 @@ class DatabaseManager:
 
     # ---------- Utilities ----------
     def clear_all(self) -> None:
-        """Delete all data (used for tests)."""
         with self._lock:
             self.conn.execute("DELETE FROM clients")
             self.conn.execute("DELETE FROM messages")
             self.conn.commit()
 
     def close(self):
-        """Safely close database connection."""
         with self._lock:
             try:
                 self.conn.commit()

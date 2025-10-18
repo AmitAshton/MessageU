@@ -8,15 +8,11 @@ import os
 class CryptoUtils:
     # ---------- RSA ----------
     @staticmethod
-    def generate_rsa_keys(key_size: int = 1024):
-        """Generate RSA public/private key pair."""
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=key_size,
-            backend=default_backend()
-        )
-        public_key = private_key.public_key()
-        return private_key, public_key
+    def generate_rsa_keys():
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        priv = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pub = priv.public_key()
+        return priv, pub
 
     @staticmethod
     def rsa_encrypt(public_key, data: bytes) -> bytes:
@@ -43,11 +39,11 @@ class CryptoUtils:
         )
 
     @staticmethod
-    def export_public_key(public_key) -> bytes:
-        """Serialize public key to PEM format."""
-        return public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
+    def export_public_key(pub_key) -> bytes:
+        from cryptography.hazmat.primitives import serialization
+        return pub_key.public_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
 
     @staticmethod
@@ -58,10 +54,6 @@ class CryptoUtils:
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()
         )
-
-    @staticmethod
-    def import_public_key(pem_data: bytes):
-        return serialization.load_pem_public_key(pem_data, backend=default_backend())
 
     @staticmethod
     def import_private_key(pem_data: bytes):
@@ -97,3 +89,11 @@ class CryptoUtils:
         # Remove PKCS7 padding
         pad_len = padded_plaintext[-1]
         return padded_plaintext[:-pad_len]
+
+    @staticmethod
+    def import_public_key(data: bytes):
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.backends import default_backend
+        # Load as DER (the spec defines binary key transfer)
+        return serialization.load_der_public_key(data, backend=default_backend())
+

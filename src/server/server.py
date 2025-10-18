@@ -24,8 +24,16 @@ class Server:
     def run(self):
         self.logger.separator()
         self.logger.info("Server is running and waiting for connections.")
-        while True:
-            conn, addr = self.socket.accept()
-            self.logger.info(f"New connection from {addr}")
-            thread = threading.Thread(target=self.handle_client, args=(conn, addr), daemon=True)
-            thread.start()
+        self.socket.settimeout(1.0)  # 1 second timeout
+        try:
+            while True:
+                try:
+                    conn, addr = self.socket.accept()
+                    self.logger.info(f"New connection from {addr}")
+                    threading.Thread(target=self.handle_client, args=(conn, addr), daemon=True).start()
+                except socket.timeout:
+                    continue  # check for Ctrl+C every second
+        except KeyboardInterrupt:
+            self.logger.info("KeyboardInterrupt received. Shutting down server gracefully...")
+            self.socket.close()
+            exit(0)
