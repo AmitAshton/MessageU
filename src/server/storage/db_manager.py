@@ -7,8 +7,9 @@ import uuid
 import os
 import threading
 
+
 class DatabaseManager:
-    """Thread-safe SQLite database manager with BLOB-based key storage."""
+    """Thread-safe SQLite database manager with BLOB username + key storage."""
 
     def __init__(self, db_path: str = "defensive.db"):
         self.db_path = db_path
@@ -26,7 +27,7 @@ class DatabaseManager:
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS clients (
                     id TEXT PRIMARY KEY,
-                    username TEXT UNIQUE,
+                    username BLOB UNIQUE,
                     public_key BLOB,
                     last_seen TEXT
                 )
@@ -48,31 +49,42 @@ class DatabaseManager:
             try:
                 self.conn.execute(
                     "INSERT INTO clients (id, username, public_key, last_seen) VALUES (?, ?, ?, ?)",
-                    (str(client.id), client.username, client.public_key, client.last_seen.isoformat())
+                    (
+                        str(client.id),
+                        client.username_raw,  # store as raw BLOB including null
+                        client.public_key,
+                        client.last_seen.isoformat(),
+                    ),
                 )
                 self.conn.commit()
             except sqlite3.IntegrityError as e:
                 raise ValueError(f"Client with username '{client.username}' already exists") from e
 
     def get_client_by_username(self, username: str) -> Optional[ClientRecord]:
+        # include null termination when searching
+        name_bytes = username.encode("ascii") + b"\x00"
         with self._lock:
             row = self.conn.execute(
-                "SELECT id, username, public_key, last_seen FROM clients WHERE username = ?", (username,)
+                "SELECT id, username, public_key, last_seen FROM clients WHERE username = ?",
+                (name_bytes,),
             ).fetchone()
             if not row:
                 return None
-            c = ClientRecord(row[1], row[2], uuid.UUID(row[0]))
+            username_clean = row[1].decode("ascii")
+            c = ClientRecord(username_clean, row[2], uuid.UUID(row[0]))
             c._last_seen = datetime.fromisoformat(row[3])
             return c
 
     def get_client_by_id(self, client_id: uuid.UUID) -> Optional[ClientRecord]:
         with self._lock:
             row = self.conn.execute(
-                "SELECT id, username, public_key, last_seen FROM clients WHERE id = ?", (str(client_id),)
+                "SELECT id, username, public_key, last_seen FROM clients WHERE id = ?",
+                (str(client_id),),
             ).fetchone()
             if not row:
                 return None
-            c = ClientRecord(row[1], row[2], uuid.UUID(row[0]))
+            username_clean = row[1].decode("ascii")
+            c = ClientRecord(username_clean, row[2], uuid.UUID(row[0]))
             c._last_seen = datetime.fromisoformat(row[3])
             return c
 
@@ -81,7 +93,8 @@ class DatabaseManager:
             rows = self.conn.execute("SELECT id, username, public_key, last_seen FROM clients").fetchall()
             clients = []
             for row in rows:
-                c = ClientRecord(row[1], row[2], uuid.UUID(row[0]))
+                username_clean = row[1].decode("ascii")
+                c = ClientRecord(username_clean, row[2], uuid.UUID(row[0]))
                 c._last_seen = datetime.fromisoformat(row[3])
                 clients.append(c)
             return clients

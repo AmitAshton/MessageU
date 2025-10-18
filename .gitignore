@@ -4,7 +4,7 @@ venv/
 Thumbs.db__pycache__/
 *.pyc
 server.log
-
+defensive.db
 *.obj
 *.pdb
 *.dll

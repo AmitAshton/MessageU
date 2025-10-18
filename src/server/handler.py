@@ -125,6 +125,7 @@ class RequestHandler:
 
     def _handle_send_message(self, sender_id: uuid.UUID, payload: bytes):
         from protocol.payload import PayloadParser
+        from protocol.enums import MessageType
         dest_id, msg_type, content = PayloadParser.parse_send_message_payload(payload)
 
         dest_client = self.db.get_client_by_id(dest_id)
@@ -132,10 +133,21 @@ class RequestHandler:
             self.logger.error(f"Send failed: destination {dest_id} not found")
             return ResponseBuilder.build_error()
 
-        # Server just stores the message as received
+        # Validate message type
+        if msg_type not in [MessageType.REQUEST_SYM_KEY, MessageType.SEND_SYM_KEY,
+                            MessageType.TEXT_MESSAGE, MessageType.FILE_MESSAGE]:
+            self.logger.error(f"Unsupported message type: {msg_type}")
+            return ResponseBuilder.build_error()
+
+        # Store message as-is (Stateless server)
         message = MessageRecord(dest_id, sender_id, msg_type, content)
         self.db.save_message(message)
-        self.logger.info(f"Stored message from {sender_id} to {dest_id} (type={msg_type})")
+
+        if msg_type == MessageType.FILE_MESSAGE:
+            self.logger.info(f"Stored file message from {sender_id} to {dest_id} ({len(content)} bytes)")
+        else:
+            self.logger.info(f"Stored message from {sender_id} to {dest_id} (type={msg_type})")
+
         message_id = int(message.id.int & 0xFFFFFFFF)
         return ResponseBuilder.build_message_stored(dest_id, message_id)
 
