@@ -1,0 +1,6 @@
+﻿  protocol.cpp
+C:\Users\AmitAshton\Desktop\University\MessageU\src\client\protocol.cpp(65,22): error C2039: 'back_inserter': is not a member of 'std'
+      C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.42.34433\include\stdexcept(19,1):
+      see declaration of 'std'
+  
+C:\Users\AmitAshton\Desktop\University\MessageU\src\client\protocol.cpp(65,22): error C3861: 'back_inserter': identifier not found
