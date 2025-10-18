@@ -10,7 +10,7 @@ class CryptoUtils:
     @staticmethod
     def generate_rsa_keys():
         from cryptography.hazmat.primitives.asymmetric import rsa
-        priv = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        priv = rsa.generate_private_key(public_exponent=65537, key_size=1024)
         pub = priv.public_key()
         return priv, pub
 
