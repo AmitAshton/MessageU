@@ -1,4 +1,4 @@
-import socket
+﻿import socket
 import uuid
 
 from protocol.header import RequestHeader
@@ -10,7 +10,6 @@ from storage.db_manager import DatabaseManager
 from models.client import ClientRecord
 from models.message import MessageRecord
 from utils.logger import ServerLogger
-from utils.crypto_utils import CryptoUtils
 
 
 class RequestHandler:
@@ -21,9 +20,6 @@ class RequestHandler:
         self.addr = addr
         self.db = DatabaseManager("defensive.db")
         self.logger = ServerLogger()
-        # Each server instance can have its own private key
-        # (In production, you'd persist this to disk)
-        self.private_key, self.public_key = CryptoUtils.generate_rsa_keys()
 
     def process(self):
         try:
@@ -155,7 +151,7 @@ class RequestHandler:
         pending = self.db.get_pending_messages(client_id)
         if not pending:
             self.logger.debug(f"No pending messages for {client_id}")
-            return ResponseBuilder.build_message_stored(client_id, 0)
+            return ResponseBuilder.build_pending_messages(b"")
 
         messages_bytes = b""
         for msg in pending:
@@ -170,3 +166,14 @@ class RequestHandler:
             self.db.delete_message(msg.id)
 
         return ResponseBuilder.build_pending_messages(messages_bytes)
+
+    def _handle_client_list(self, client_id: uuid.UUID):
+        all_clients = self.db.list_clients()
+        other_clients = [c for c in all_clients if c.id != client_id]
+
+        if not other_clients:
+            self.logger.info(f"Client list requested by {client_id}, no other clients found.")
+            return ResponseBuilder.build_client_list([])
+
+        self.logger.info(f"Returning client list ({len(other_clients)} clients) to {client_id}")
+        return ResponseBuilder.build_client_list(other_clients)

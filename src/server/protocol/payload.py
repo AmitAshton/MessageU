@@ -1,4 +1,4 @@
-import struct
+﻿import struct
 import uuid
 from typing import Tuple
 
@@ -6,18 +6,31 @@ class PayloadParser:
     @staticmethod
     def parse_register_payload(data: bytes) -> Tuple[str, bytes]:
         """
-        Correctly parse a registration payload of the form:
-        username (null-terminated ASCII) + DER-encoded public key.
+        Parse a registration payload with fixed-field lengths as per spec [189, 241].
+        Field 1: username (255 bytes, null-padded ASCII)
+        Field 2: public key (160 bytes, DER-encoded)
         """
+        NAME_FIELD_SIZE = 255
+        KEY_FIELD_SIZE = 160
+        EXPECTED_SIZE = NAME_FIELD_SIZE + KEY_FIELD_SIZE
+
+        if len(data) != EXPECTED_SIZE:
+            raise ValueError(f"Malformed registration payload: expected {EXPECTED_SIZE} bytes, got {len(data)}")
+
+        name_field = data[:NAME_FIELD_SIZE]
+        
+        public_key = data[NAME_FIELD_SIZE:]
+
         try:
-            sep = data.index(0)
-            name = data[:sep].decode("ascii")
-            public_key = data[sep + 1:]
-            if not name or not public_key:
-                raise ValueError
-            return name, public_key
-        except Exception:
-            raise ValueError("Malformed registration payload")
+            null_index = name_field.index(b'\x00')
+            name = name_field[:null_index].decode("ascii")
+        except ValueError:
+            name = name_field.rstrip(b'\x00').decode("ascii")
+        
+        if not name or len(public_key) != KEY_FIELD_SIZE:
+             raise ValueError("Invalid registration payload components")
+             
+        return name, public_key
 
     @staticmethod
     def parse_send_message_payload(data: bytes):

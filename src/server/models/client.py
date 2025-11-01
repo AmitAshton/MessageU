@@ -45,7 +45,7 @@ class ClientRecord(BaseRecord):
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": str(self._id),
-            "username": self._username,
+            "username": self.username,
             "public_key": self._public_key.hex(),
             "last_seen": self._last_seen.isoformat(),
         }

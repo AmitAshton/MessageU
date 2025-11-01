@@ -8,7 +8,6 @@ sys.path.insert(0, SERVER_DIR)
 
 import pytest
 from storage.db_manager import DatabaseManager
-from utils.crypto_utils import CryptoUtils
 from utils.logger import ServerLogger
 
 @pytest.fixture(scope="session", autouse=True)
@@ -32,11 +31,5 @@ def db(tmp_path):
     try:
         if hasattr(db, "conn"):
             db.conn.close()
-        if os.path.exists("defensive.db"):
-            os.remove("defensive.db")
     except PermissionError:
         pass
-
-@pytest.fixture
-def crypto():
-    return CryptoUtils()

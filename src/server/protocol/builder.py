@@ -1,4 +1,4 @@
-import struct
+﻿import struct
 import uuid
 from .header import ResponseHeader
 from .enums import ResponseCode, ProtocolVersion
@@ -26,17 +26,13 @@ class ResponseBuilder:
 
     @staticmethod
     def build_public_key(client_id: uuid.UUID, public_key: bytes) -> bytes:
-        # Payload = 16 bytes client UUID + public key bytes
         payload = client_id.bytes + public_key
-        payload_size = len(payload)
+        
+        if len(payload) != (16 + 160):
+            pass 
 
-        # Correct header: version(1) + response_code(2) + payload_size(4)
-        header = (
-                ProtocolVersion.SERVER.to_bytes(1, "little") +
-                ResponseCode.PUBLIC_KEY.to_bytes(2, "little") +
-                payload_size.to_bytes(4, "little")
-        )
-        return header + payload
+        header = ResponseHeader(ProtocolVersion.SERVER, ResponseCode.PUBLIC_KEY, len(payload))
+        return header.to_bytes() + payload
 
     @staticmethod
     def build_message_stored(to_client: uuid.UUID, message_id: int) -> bytes:
