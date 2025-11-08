@@ -1,5 +1,9 @@
 #include "RSAWrapper.h"
+#include <cryptopp/rsa.h>     // Required for RSA::PublicKey
+#include <cryptopp/filters.h> // Required for StringSink
+#include <cryptopp/files.h>   // Required for ArraySink
 
+// --- RSAPublicWrapper Implementation ---
 
 RSAPublicWrapper::RSAPublicWrapper(const char* key, unsigned int length)
 {
@@ -13,9 +17,7 @@ RSAPublicWrapper::RSAPublicWrapper(const std::string& key)
 	_publicKey.Load(ss);
 }
 
-RSAPublicWrapper::~RSAPublicWrapper()
-{
-}
+RSAPublicWrapper::~RSAPublicWrapper() {}
 
 std::string RSAPublicWrapper::getPublicKey() const
 {
@@ -48,11 +50,11 @@ std::string RSAPublicWrapper::encrypt(const char* plain, unsigned int length)
 	return cipher;
 }
 
-
+// --- RSAPrivateWrapper Implementation ---
 
 RSAPrivateWrapper::RSAPrivateWrapper()
 {
-	_privateKey.Initialize(_rng, BITS);
+	_privateKey.GenerateRandomWithKeySize(_rng, BITS);
 }
 
 RSAPrivateWrapper::RSAPrivateWrapper(const char* key, unsigned int length)
@@ -67,9 +69,7 @@ RSAPrivateWrapper::RSAPrivateWrapper(const std::string& key)
 	_privateKey.Load(ss);
 }
 
-RSAPrivateWrapper::~RSAPrivateWrapper()
-{
-}
+RSAPrivateWrapper::~RSAPrivateWrapper() {}
 
 std::string RSAPrivateWrapper::getPrivateKey() const
 {
@@ -86,22 +86,27 @@ char* RSAPrivateWrapper::getPrivateKey(char* keyout, unsigned int length) const
 	return keyout;
 }
 
+// --- CORRECTED FUNCTION ---
+// This version generates the public key in the correct X.509 format
+// as required by the PDF and expected by the RSAPublicWrapper constructor.
 std::string RSAPrivateWrapper::getPublicKey() const
 {
-	CryptoPP::RSAFunction publicKey(_privateKey);
+	CryptoPP::RSA::PublicKey publicKey(_privateKey);
 	std::string key;
 	CryptoPP::StringSink ss(key);
-	publicKey.Save(ss);
+	publicKey.Save(ss); // Saves in X.509 format
 	return key;
 }
 
+// --- CORRECTED FUNCTION ---
 char* RSAPrivateWrapper::getPublicKey(char* keyout, unsigned int length) const
 {
-	CryptoPP::RSAFunction publicKey(_privateKey);
+	CryptoPP::RSA::PublicKey publicKey(_privateKey);
 	CryptoPP::ArraySink as(reinterpret_cast<CryptoPP::byte*>(keyout), length);
-	publicKey.Save(as);
+	publicKey.Save(as); // Saves in X.509 format
 	return keyout;
 }
+// --- END OF FIX ---
 
 std::string RSAPrivateWrapper::decrypt(const std::string& cipher)
 {

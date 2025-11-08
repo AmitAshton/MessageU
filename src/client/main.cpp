@@ -17,10 +17,13 @@ int main()
 	catch (const std::exception& e)
 	{
 		// Catch any critical initialization errors
+		// --- THIS IS THE FIX ---
+		// We now exit immediately if initialization fails.
 		std::cerr << "Fatal Error: " << e.what() << std::endl;
 		std::cerr << "Press Enter to exit." << std::endl;
 		std::cin.get();
-		return 1;
+		return 1; // Exit with an error code
+		// ---------------------
 	}
 	catch (...)
 	{

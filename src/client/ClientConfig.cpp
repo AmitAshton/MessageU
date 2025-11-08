@@ -60,15 +60,33 @@ MyInfo ClientConfig::loadMyInfo()
 	}
 
 	MyInfo info;
-	if (!std::getline(file, info.username) ||
-		!std::getline(file, info.uuid) ||
-		!std::getline(file, info.privateKeyBase64))
-	{
+
+	// Read username (line 1)
+	if (!std::getline(file, info.username)) {
 		file.close();
-		throw std::runtime_error("Error: my.info file is corrupt or incomplete.");
+		throw std::runtime_error("Error: my.info file is corrupt (cannot read username).");
 	}
 
+	// Read UUID (line 2)
+	if (!std::getline(file, info.uuid)) {
+		file.close();
+		throw std::runtime_error("Error: my.info file is corrupt (cannot read uuid).");
+	}
+
+	// --- THIS IS THE FIX ---
+	// Read the rest of the file as the private key
+	// This handles multi-line Base64 keys
+	std::stringstream keyStream;
+	keyStream << file.rdbuf(); // Read everything remaining
+	info.privateKeyBase64 = keyStream.str();
+	// ---------------------
+
 	file.close();
+
+	if (info.privateKeyBase64.empty()) {
+		throw std::runtime_error("Error: my.info file is corrupt (private key is empty).");
+	}
+
 	return info;
 }
 
@@ -81,7 +99,7 @@ void ClientConfig::saveMyInfo(const std::string& username, const std::string& uu
 
 	file << username << std::endl;
 	file << uuid << std::endl;
-	file << privateKeyBase64 << std::endl;
+	file << privateKeyBase64; // No std::endl, Base64 output may have its own newlines
 
 	file.close();
 }
