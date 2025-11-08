@@ -49,19 +49,17 @@ std::string MessageUClient::getStringFromUser(const std::string& prompt)
 
 // --- Constructor / Destructor ---
 
+// --- THIS IS THE FIX ---
+// Removed the try...catch block. If initialization fails,
+// the exception will be caught by main.cpp, which will exit the program.
 MessageUClient::MessageUClient() : _myPrivateKey(nullptr), _isRegistered(false)
 {
 	_myUUID.fill(0);
-	try {
-		loadMyInfo();
-		connect();
-		std::cout << "Client is connected to server." << std::endl;
-	}
-	catch (const std::exception& e) {
-		std::cerr << "Initialization failed: " << e.what() << std::endl;
-		std::cerr << "Please check 'server.info' and 'my.info' files and restart." << std::endl;
-	}
+	loadMyInfo(); // This will now throw if my.info exists and is corrupt
+	connect();
+	std::cout << "Client is connected to server." << std::endl;
 }
+// ---------------------
 
 MessageUClient::~MessageUClient()
 {
@@ -81,11 +79,17 @@ void MessageUClient::loadMyInfo()
 		memcpy(_myUUID.data(), rawUUID.data(), UUID_SIZE);
 
 		// Load private key
+		// This is where 'BER decode error' was thrown
 		std::string rawPrivateKey = Base64Wrapper::decode(_myInfo.privateKeyBase64);
 		_myPrivateKey = new RSAPrivateWrapper(rawPrivateKey);
 
 		_isRegistered = true;
 		std::cout << "Logged in as: " << _myInfo.username << std::endl;
+	}
+	else
+	{
+		// This is fine, user is not registered yet
+		_isRegistered = false;
 	}
 }
 

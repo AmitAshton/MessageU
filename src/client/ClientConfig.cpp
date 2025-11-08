@@ -87,6 +87,16 @@ MyInfo ClientConfig::loadMyInfo()
 		throw std::runtime_error("Error: my.info file is corrupt (private key is empty).");
 	}
 
+	// Trim leading/trailing whitespace/newlines from key
+	size_t first = info.privateKeyBase64.find_first_not_of(" \t\n\r");
+	if (std::string::npos == first)
+	{
+		throw std::runtime_error("Error: my.info file is corrupt (private key is empty).");
+	}
+	size_t last = info.privateKeyBase64.find_last_not_of(" \t\n\r");
+	info.privateKeyBase64 = info.privateKeyBase64.substr(first, (last - first + 1));
+
+
 	return info;
 }
 
@@ -99,7 +109,10 @@ void ClientConfig::saveMyInfo(const std::string& username, const std::string& uu
 
 	file << username << std::endl;
 	file << uuid << std::endl;
-	file << privateKeyBase64; // No std::endl, Base64 output may have its own newlines
+	// --- THIS IS THE FIX ---
+	// Write the key without an extra newline at the end
+	file << privateKeyBase64;
+	// ---------------------
 
 	file.close();
 }
