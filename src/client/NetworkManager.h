@@ -2,12 +2,25 @@
 
 // Required definitions for Winsock
 #define WIN32_LEAN_AND_MEAN
+
+#define NOMINMAX
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <string>
+#include <cstdint> // For uint16_t, uint32_t
 
 // Link the Winsock library
 #pragma comment(lib, "Ws2_32.lib")
+
+/**
+ * @struct ServerResponse
+ * @brief A structure to hold the processed response from the server.
+ */
+struct ServerResponse {
+	uint16_t code;        // The response code (e.g., 2100, 9000)
+	std::string payload;  // The raw payload data
+};
 
 /**
  * @class NetworkManager
@@ -61,21 +74,20 @@ public:
 	 * @brief Sends a block of data to the server.
 	 *
 	 * Ensures all data in the buffer is sent.
-	 * @param buffer The data to send.
-	 * @param size The size of the data in bytes.
+	 * @param data The data to send.
 	 * @throws std::runtime_error if the send operation fails.
 	 */
-	void send_data(const char* buffer, size_t size);
+	void send_data(const std::string& data);
 
 	/**
 	 * @brief Reads the full response from the server.
 	 *
 	 * This function implements the protocol's receive logic:
 	 * 1. Reads the 7-byte response header.
-	 * 2. Parses the payload size from the header.
+	 * 2. Parses the code and payload size.
 	 * 3. Reads the exact payload size.
-	 * @return A std::string containing the raw payload.
+	 * @return A ServerResponse struct containing the code and payload.
 	 * @throws std::runtime_error if the receive operation fails.
 	 */
-	std::string receive_response();
+	ServerResponse receive_response();
 };
