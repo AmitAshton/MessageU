@@ -1,0 +1,87 @@
+#include "ClientConfig.h"
+#include <fstream>      // For file I/O (ifstream, ofstream)
+#include <sstream>      // For string parsing (stringstream)
+#include <stdexcept>    // For runtime_error
+#include <sys/stat.h>   // For checking file existence
+
+// --- server.info implementation ---
+
+std::pair<std::string, int> ClientConfig::loadServerInfo()
+{
+	std::ifstream file(SERVER_INFO_FILE);
+	if (!file.is_open()) {
+		throw std::runtime_error("Error: server.info file not found or could not be opened.");
+	}
+
+	std::string line;
+	if (std::getline(file, line))
+	{
+		std::size_t colonPos = line.find(':');
+		if (colonPos == std::string::npos) {
+			file.close();
+			throw std::runtime_error("Error: Invalid format in server.info. Expected 'host:port'.");
+		}
+
+		try {
+			std::string host = line.substr(0, colonPos);
+			int port = std::stoi(line.substr(colonPos + 1));
+			file.close();
+			return { host, port };
+		}
+		catch (const std::exception&) {
+			file.close();
+			throw std::runtime_error("Error: Failed to parse port in server.info. Port must be a number.");
+		}
+	}
+
+	file.close();
+	throw std::runtime_error("Error: server.info file is empty.");
+}
+
+
+// --- my.info implementation ---
+
+bool ClientConfig::myInfoExists()
+{
+	// Check if file exists
+	struct stat buffer;
+	return (stat(MY_INFO_FILE, &buffer) == 0);
+}
+
+MyInfo ClientConfig::loadMyInfo()
+{
+	if (!myInfoExists()) {
+		throw std::runtime_error("Error: my.info file not found.");
+	}
+
+	std::ifstream file(MY_INFO_FILE);
+	if (!file.is_open()) {
+		throw std::runtime_error("Error: Could not open my.info for reading.");
+	}
+
+	MyInfo info;
+	if (!std::getline(file, info.username) ||
+		!std::getline(file, info.uuid) ||
+		!std::getline(file, info.privateKeyBase64))
+	{
+		file.close();
+		throw std::runtime_error("Error: my.info file is corrupt or incomplete.");
+	}
+
+	file.close();
+	return info;
+}
+
+void ClientConfig::saveMyInfo(const std::string& username, const std::string& uuid, const std::string& privateKeyBase64)
+{
+	std::ofstream file(MY_INFO_FILE);
+	if (!file.is_open()) {
+		throw std::runtime_error("Error: Could not open my.info for writing.");
+	}
+
+	file << username << std::endl;
+	file << uuid << std::endl;
+	file << privateKeyBase64 << std::endl;
+
+	file.close();
+}
