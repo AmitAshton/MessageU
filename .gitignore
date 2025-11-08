@@ -1,11 +1,98 @@
-venv/
-.idea/
+# ###########################
+# ## General / OS
+# ###########################
+
+# Files created by macOS
 .DS_Store
-Thumbs.db__pycache__/
-*.pyc
-server.log
-defensive.db
-*.obj
-*.pdb
-*.dll
+.AppleDouble
+.LSOverride
+
+# Files created by Windows
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ###########################
+# ## IDE & Editors
+# ###########################
+
+# Visual Studio Code (as requested)
+.vscode/
+
+# JetBrains / .idea (as requested: PyCharm, CLion)
+.idea/
+*.iml
+*.iws
+
+# Visual Studio (based on project PDF)
 .vs/
+*.VC.db
+*.VC.VC.opendb
+*.suo
+*.user
+*.sln.docstates
+
+# ###########################
+# ## Python (Server)
+# ###########################
+
+# Bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.env
+.venv
+venv/
+env/
+
+# Packaging artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+
+# ###########################
+# ## C++ (Client)
+# ###########################
+
+# Build artifacts
+*.o
+*.obj
+*.lib
+*.dll
+*.exe
+*.so
+*.a
+*.ilk
+*.pdb
+*.pch
+*.tlog
+
+# Build output directories (Visual Studio)
+Debug/
+Release/
+x64/
+Win32/
+ipch/
+
+# ###########################
+# ## Project Specific (MessageU)
+# ###########################
+
+# Log files (as requested)
+*.log
+server.log
+
+# Local database file (from PDF bonus)
+defensive.db
+
+# Local configuration files (from PDF spec)
+# These files contain local user data or server info
+myport.info
+server.info
+me.info
+my.info
