@@ -20,7 +20,7 @@ class ServerLogger:
             os.makedirs(dir_name, exist_ok=True)
 
         self.logger = logging.getLogger("MessageUServer")
-        if not self.logger.handlers:  # prevent duplication
+        if not self.logger.handlers:
             self.logger.setLevel(logging.DEBUG)
             fmt = logging.Formatter("%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s")
 

@@ -88,19 +88,8 @@ class RequestHandler:
             self.logger.error(f"Unknown request code {code}")
             return ResponseBuilder.build_error()
 
-    # ---------- Individual Handlers ----------
 
     def _handle_register(self, payload: bytes):
-        """
-        Handles user registration.
-        Payload format is defined by fixed fields:
-        - Username: 255 bytes (null-padded ASCII)
-        - Public Key: 160 bytes
-        """
-        # *** BUG FIX ***
-        # The original code incorrectly parsed the payload.
-        # This now uses the correct PayloadParser, which handles the
-        # fixed-width fields as defined in the protocol.
         try:
             username, public_key = PayloadParser.parse_register_payload(payload)
         except Exception as e:
@@ -124,7 +113,7 @@ class RequestHandler:
 
     def _handle_public_key(self, payload: bytes):
         try:
-            # Per protocol, payload is just the Client ID
+            # payload is just the Client ID
             target_id = uuid.UUID(bytes=payload[:16])
         except Exception:
             self.logger.error("Invalid public key request payload")
@@ -139,9 +128,6 @@ class RequestHandler:
         return ResponseBuilder.build_public_key(client.id, client.public_key)
 
     def _handle_send_message(self, sender_id: uuid.UUID, payload: bytes):
-        # Imports already at top of file
-        # from protocol.payload import PayloadParser
-        # from protocol.enums import MessageType
         try:
             dest_id, msg_type, content = PayloadParser.parse_send_message_payload(payload)
         except Exception as e:
@@ -181,7 +167,7 @@ class RequestHandler:
         messages_bytes = b""
         ids_to_delete = []
         for msg in pending:
-            # Per protocol, MessageID is 4 bytes
+            # MessageID is 4 bytes
             msg_id_bytes = (int(msg.id.int & 0xFFFFFFFF)).to_bytes(4, "little")
             
             msg_bytes = (
@@ -194,7 +180,7 @@ class RequestHandler:
             messages_bytes += msg_bytes
             ids_to_delete.append(msg.id)
 
-        # Delete messages *after* building the response
+        # Delete messages after building the response
         for msg_id in ids_to_delete:
             self.db.delete_message(msg_id)
 
@@ -203,7 +189,7 @@ class RequestHandler:
 
     def _handle_client_list(self, client_id: uuid.UUID):
         all_clients = self.db.list_clients()
-        # Per protocol, list should not include the requester
+        # list should not include the requester
         other_clients = [c for c in all_clients if c.id != client_id]
 
         if not other_clients:

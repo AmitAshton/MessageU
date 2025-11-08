@@ -1,10 +1,9 @@
 #include "ClientConfig.h"
-#include <fstream>      // For file I/O (ifstream, ofstream)
-#include <sstream>      // For string parsing (stringstream)
-#include <stdexcept>    // For runtime_error
-#include <sys/stat.h>   // For checking file existence
+#include <fstream>     
+#include <sstream>     
+#include <stdexcept>
+#include <sys/stat.h>  
 
-// --- server.info implementation ---
 
 std::pair<std::string, int> ClientConfig::loadServerInfo()
 {
@@ -39,11 +38,9 @@ std::pair<std::string, int> ClientConfig::loadServerInfo()
 }
 
 
-// --- my.info implementation ---
 
 bool ClientConfig::myInfoExists()
 {
-	// Check if file exists
 	struct stat buffer;
 	return (stat(MY_INFO_FILE, &buffer) == 0);
 }
@@ -61,25 +58,19 @@ MyInfo ClientConfig::loadMyInfo()
 
 	MyInfo info;
 
-	// Read username (line 1)
 	if (!std::getline(file, info.username)) {
 		file.close();
 		throw std::runtime_error("Error: my.info file is corrupt (cannot read username).");
 	}
 
-	// Read UUID (line 2)
 	if (!std::getline(file, info.uuid)) {
 		file.close();
 		throw std::runtime_error("Error: my.info file is corrupt (cannot read uuid).");
 	}
 
-	// --- THIS IS THE FIX ---
-	// Read the rest of the file as the private key
-	// This handles multi-line Base64 keys
 	std::stringstream keyStream;
-	keyStream << file.rdbuf(); // Read everything remaining
+	keyStream << file.rdbuf();
 	info.privateKeyBase64 = keyStream.str();
-	// ---------------------
 
 	file.close();
 
@@ -87,7 +78,6 @@ MyInfo ClientConfig::loadMyInfo()
 		throw std::runtime_error("Error: my.info file is corrupt (private key is empty).");
 	}
 
-	// Trim leading/trailing whitespace/newlines from key
 	size_t first = info.privateKeyBase64.find_first_not_of(" \t\n\r");
 	if (std::string::npos == first)
 	{
@@ -109,10 +99,7 @@ void ClientConfig::saveMyInfo(const std::string& username, const std::string& uu
 
 	file << username << std::endl;
 	file << uuid << std::endl;
-	// --- THIS IS THE FIX ---
-	// Write the key without an extra newline at the end
 	file << privateKeyBase64;
-	// ---------------------
 
 	file.close();
 }

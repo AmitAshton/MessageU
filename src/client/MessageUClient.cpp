@@ -1,15 +1,13 @@
 #include "MessageUClient.h"
-#include "Request.h"        // For all Request classes
-#include "AESWrapper.h"     // For AES operations
-#include "Base64Wrapper.h"  // For encoding/decoding private key
+#include "Request.h"       
+#include "AESWrapper.h"   
+#include "Base64Wrapper.h"  
 #include <iostream>
-#include <iomanip>          // For std::setw, std::setfill
-#include <sstream>          // For std::stringstream
+#include <iomanip>      
+#include <sstream>       
 #include <stdexcept>
-#include <cstring>          // For memcpy
-#include <limits>           // For std::numeric_limits
-
-// --- Helper Functions ---
+#include <cstring>   
+#include <limits>
 
 std::string MessageUClient::getHexFromUUID(const std::string& uuid_bytes) {
 	std::stringstream ss;
@@ -22,7 +20,7 @@ std::string MessageUClient::getHexFromUUID(const std::string& uuid_bytes) {
 
 std::string MessageUClient::getUUIDFromHex(const std::string& hex_string) {
 	std::string bytes;
-	if (hex_string.length() != 32) { // 16 bytes * 2 hex chars
+	if (hex_string.length() != 32) {
 		throw std::runtime_error("Invalid hex UUID string length.");
 	}
 	for (unsigned int i = 0; i < hex_string.length(); i += 2) {
@@ -47,28 +45,20 @@ std::string MessageUClient::getStringFromUser(const std::string& prompt)
 }
 
 
-// --- Constructor / Destructor ---
-
-// --- THIS IS THE FIX ---
-// Removed the try...catch block. If initialization fails,
-// the exception will be caught by main.cpp, which will exit the program.
 MessageUClient::MessageUClient() : _myPrivateKey(nullptr), _isRegistered(false)
 {
 	_myUUID.fill(0);
-	loadMyInfo(); // This will now throw if my.info exists and is corrupt
+	loadMyInfo();
 	connect();
 	std::cout << "Client is connected to server." << std::endl;
 }
-// ---------------------
 
 MessageUClient::~MessageUClient()
 {
-	delete _myPrivateKey; // Safe to delete nullptr
+	delete _myPrivateKey;
 	_netManager.disconnect_server();
 }
 
-
-// --- Core Methods ---
 
 void MessageUClient::loadMyInfo()
 {
@@ -78,8 +68,6 @@ void MessageUClient::loadMyInfo()
 		std::string rawUUID = getUUIDFromHex(_myInfo.uuid);
 		memcpy(_myUUID.data(), rawUUID.data(), UUID_SIZE);
 
-		// Load private key
-		// This is where 'BER decode error' was thrown
 		std::string rawPrivateKey = Base64Wrapper::decode(_myInfo.privateKeyBase64);
 		_myPrivateKey = new RSAPrivateWrapper(rawPrivateKey);
 
@@ -88,7 +76,6 @@ void MessageUClient::loadMyInfo()
 	}
 	else
 	{
-		// This is fine, user is not registered yet
 		_isRegistered = false;
 	}
 }
@@ -118,11 +105,11 @@ int MessageUClient::getUserSelection()
 	int selection = -1;
 	if (!(std::cin >> selection))
 	{
-		std::cin.clear(); // Clear error state
-		clearCinBuffer(); // Discard the bad input
-		return -1; // Return invalid selection
+		std::cin.clear();
+		clearCinBuffer();
+		return -1;
 	}
-	clearCinBuffer(); // Discard trailing newline
+	clearCinBuffer();
 	return selection;
 }
 
@@ -153,15 +140,12 @@ void MessageUClient::run()
 		}
 		catch (const std::exception& e) {
 			std::cerr << "An error occurred: " << e.what() << std::endl;
-			// Try to reconnect if an error occurs
 			try { connect(); }
 			catch (...) { std::cerr << "Failed to reconnect." << std::endl; }
 		}
 	}
 }
 
-
-// --- Action Handlers ---
 
 void MessageUClient::handleRegister()
 {
@@ -176,26 +160,22 @@ void MessageUClient::handleRegister()
 		return;
 	}
 
-	// 1. Generate keys
 	RSAPrivateWrapper newKeys;
-	std::string pubKey = newKeys.getPublicKey(); // Raw 160 bytes
+	std::string pubKey = newKeys.getPublicKey();
 
-	// 2. Build request
 	RegisterRequest req(name, pubKey);
 
-	// 3. Send and receive
 	_netManager.send_data(req.getPackedRequest());
 	ServerResponse res = _netManager.receive_response();
 
-	// 4. Handle response
-	if (res.code == 2100) { // REGISTER_SUCCESS
+	if (res.code == 2100) {
 		std::string uuid_bytes = res.payload;
 		std::string uuid_hex = getHexFromUUID(uuid_bytes);
 		std::string privKeyRaw = newKeys.getPrivateKey();
 		std::string privKey64 = Base64Wrapper::encode(privKeyRaw);
 
 		ClientConfig::saveMyInfo(name, uuid_hex, privKey64);
-		loadMyInfo(); // Reload state
+		loadMyInfo();
 		std::cout << "Registered successfully. Your UUID is: " << uuid_hex << std::endl;
 	}
 	else {
@@ -214,7 +194,7 @@ void MessageUClient::handleClientList()
 	_netManager.send_data(req.getPackedRequest());
 	ServerResponse res = _netManager.receive_response();
 
-	if (res.code == 2101) { // CLIENT_LIST
+	if (res.code == 2101) {
 		std::cout << "Client List:" << std::endl;
 		std::string payload = res.payload;
 		const size_t recordSize = UUID_SIZE + CLIENT_NAME_SIZE;
@@ -223,7 +203,7 @@ void MessageUClient::handleClientList()
 			std::string uuid_bytes = payload.substr(i, UUID_SIZE);
 			std::string name_bytes = payload.substr(i + UUID_SIZE, CLIENT_NAME_SIZE);
 
-			std::string name_str(name_bytes.c_str()); // Strips at null terminator
+			std::string name_str(name_bytes.c_str());
 
 			std::array<char, UUID_SIZE> uuid_arr;
 			memcpy(uuid_arr.data(), uuid_bytes.data(), UUID_SIZE);
@@ -255,7 +235,7 @@ void MessageUClient::handlePublicKey()
 	_netManager.send_data(req.getPackedRequest());
 	ServerResponse res = _netManager.receive_response();
 
-	if (res.code == 2102) { // PUBLIC_KEY
+	if (res.code == 2102) {
 		std::string pubKey = res.payload.substr(UUID_SIZE);
 		_registry.setPublicKey(target->uuid, pubKey);
 		std::cout << "Successfully received public key for " << name << std::endl;
@@ -283,21 +263,18 @@ void MessageUClient::handleSendSymKey()
 		return;
 	}
 
-	// 1. Generate new symmetric key
 	unsigned char key_bytes[AESWrapper::DEFAULT_KEYLENGTH];
 	AESWrapper::GenerateKey(key_bytes, AESWrapper::DEFAULT_KEYLENGTH);
 	std::string symKey(reinterpret_cast<char*>(key_bytes), AESWrapper::DEFAULT_KEYLENGTH);
 
-	// 2. Encrypt key with target's public key
 	RSAPublicWrapper rsaPub(target->publicKey);
 	std::string encryptedKey = rsaPub.encrypt(symKey);
 
-	// 3. Build and send request
 	SendMessageRequest req(_myUUID, target->uuid, MessageType::SEND_SYM_KEY, encryptedKey);
 	_netManager.send_data(req.getPackedRequest());
 	ServerResponse res = _netManager.receive_response();
 
-	if (res.code == 2103) { // MESSAGE_STORED
+	if (res.code == 2103) {
 		_registry.setSymmetricKey(target->uuid, symKey);
 		std::cout << "Symmetric key sent to " << name << std::endl;
 	}
@@ -320,7 +297,6 @@ void MessageUClient::handleRequestSymKey()
 		return;
 	}
 
-	// Build and send request with empty content
 	SendMessageRequest req(_myUUID, target->uuid, MessageType::REQUEST_SYM_KEY, "");
 	_netManager.send_data(req.getPackedRequest());
 	ServerResponse res = _netManager.receive_response();
@@ -353,11 +329,9 @@ void MessageUClient::handleSendText()
 
 	std::string text = getStringFromUser("Enter message: ");
 
-	// 1. Encrypt text with symmetric key
 	AESWrapper aes(reinterpret_cast<const unsigned char*>(target->symmetricKey.c_str()), AESWrapper::DEFAULT_KEYLENGTH);
 	std::string cipher = aes.encrypt(text.c_str(), (unsigned int)text.length());
 
-	// 2. Build and send request
 	SendMessageRequest req(_myUUID, target->uuid, MessageType::TEXT_MESSAGE, cipher);
 	_netManager.send_data(req.getPackedRequest());
 	ServerResponse res = _netManager.receive_response();
@@ -381,7 +355,7 @@ void MessageUClient::handlePullMessages()
 	_netManager.send_data(req.getPackedRequest());
 	ServerResponse res = _netManager.receive_response();
 
-	if (res.code != 2104) { // PENDING_MESSAGES
+	if (res.code != 2104) {
 		std::cout << "server responded with an error" << std::endl;
 		return;
 	}
@@ -390,38 +364,33 @@ void MessageUClient::handlePullMessages()
 		return;
 	}
 
-	// 3. Parse the list of messages
 	size_t offset = 0;
 	std::string payload = res.payload;
 
 	while (offset < payload.length())
 	{
-		// 1. Parse message header
 		std::array<char, UUID_SIZE> fromUUID;
 		memcpy(fromUUID.data(), &payload[offset], UUID_SIZE);
 		offset += UUID_SIZE;
 
-		uint32_t msgID = *reinterpret_cast<uint32_t*>(&payload[offset]); // Assuming little-endian
+		uint32_t msgID = *reinterpret_cast<uint32_t*>(&payload[offset]);
 		offset += sizeof(uint32_t);
 
 		MessageType msgType = static_cast<MessageType>(payload[offset]);
 		offset += sizeof(uint8_t);
 
-		uint32_t contentSize = *reinterpret_cast<uint32_t*>(&payload[offset]); // Assuming little-endian
+		uint32_t contentSize = *reinterpret_cast<uint32_t*>(&payload[offset]);
 		offset += sizeof(uint32_t);
 
-		// 2. Get content
 		std::string content = payload.substr(offset, contentSize);
 		offset += contentSize;
 
-		// 3. Find sender
 		ClientData* sender = _registry.findByUUID(fromUUID);
 		std::string senderName = sender ? sender->username : "Unknown";
 
 		std::cout << "From: " << senderName << std::endl;
 		std::cout << "Content:" << std::endl;
 
-		// 4. Handle based on type
 		switch (msgType)
 		{
 		case MessageType::REQUEST_SYM_KEY:

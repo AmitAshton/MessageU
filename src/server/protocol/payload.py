@@ -5,11 +5,6 @@ from typing import Tuple
 class PayloadParser:
     @staticmethod
     def parse_register_payload(data: bytes) -> Tuple[str, bytes]:
-        """
-        Parse a registration payload with fixed-field lengths as per spec [189, 241].
-        Field 1: username (255 bytes, null-padded ASCII)
-        Field 2: public key (160 bytes, DER-encoded)
-        """
         NAME_FIELD_SIZE = 255
         KEY_FIELD_SIZE = 160
         EXPECTED_SIZE = NAME_FIELD_SIZE + KEY_FIELD_SIZE

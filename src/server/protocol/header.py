@@ -1,7 +1,7 @@
 import struct
 import uuid
 
-# All numeric values are little-endian
+# All numeric values are little endian
 REQUEST_HEADER_FORMAT = "<16sBHI"  # UUID(16) + Version(1) + Code(2) + PayloadSize(4)
 RESPONSE_HEADER_FORMAT = "<BHI"    # Version(1) + Code(2) + PayloadSize(4)
 

@@ -2,8 +2,6 @@
 #include <stdexcept>
 #include <vector>
 
-// Define response header structure (7 bytes total)
-// We use pragma pack to ensure no padding is added by the compiler
 #pragma pack(push, 1)
 struct ResponseHeader {
 	uint8_t  version;
@@ -15,7 +13,6 @@ struct ResponseHeader {
 
 NetworkManager::NetworkManager() : _clientSocket(INVALID_SOCKET), _connected(false)
 {
-	// Initialize Winsock
 	WSADATA wsaData;
 	int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (result != 0) {
@@ -28,7 +25,6 @@ NetworkManager::~NetworkManager()
 	if (_connected) {
 		disconnect_server();
 	}
-	// Cleanup Winsock
 	WSACleanup();
 }
 
@@ -40,35 +36,31 @@ void NetworkManager::connect_to_server(const std::string& host, int port)
 
 	addrinfo* result = nullptr;
 	addrinfo hints = {};
-	hints.ai_family = AF_UNSPEC; // Allow IPv4 or IPv6
+	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
 
-	// Resolve the server address and port
 	std::string portStr = std::to_string(port);
 	int iResult = getaddrinfo(host.c_str(), portStr.c_str(), &hints, &result);
 	if (iResult != 0) {
 		throw std::runtime_error("getaddrinfo failed: " + std::to_string(iResult));
 	}
 
-	// Attempt to connect to an address until one succeeds
 	for (addrinfo* ptr = result; ptr != nullptr; ptr = ptr->ai_next)
 	{
-		// Create a SOCKET for connecting to server
 		_clientSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
 		if (_clientSocket == INVALID_SOCKET) {
 			freeaddrinfo(result);
 			throw std::runtime_error("Socket creation failed with error: " + std::to_string(WSAGetLastError()));
 		}
 
-		// Connect to server
 		iResult = connect(_clientSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
 		if (iResult == SOCKET_ERROR) {
 			closesocket(_clientSocket);
 			_clientSocket = INVALID_SOCKET;
-			continue; // Try the next address
+			continue;
 		}
-		break; // Successfully connected
+		break;
 	}
 
 	freeaddrinfo(result);
@@ -83,7 +75,6 @@ void NetworkManager::connect_to_server(const std::string& host, int port)
 void NetworkManager::disconnect_server()
 {
 	if (_connected) {
-		// Gracefully shut down the sending side
 		shutdown(_clientSocket, SD_SEND);
 		closesocket(_clientSocket);
 		_clientSocket = INVALID_SOCKET;
@@ -103,8 +94,6 @@ void NetworkManager::send_data(const std::string& data)
 	}
 
 	if (bytesSent < data.length()) {
-		// This is a simple implementation. A more robust one would
-		// loop until all bytes are sent.
 		throw std::runtime_error("Failed to send all data.");
 	}
 }
@@ -120,12 +109,10 @@ void NetworkManager::receive_exact(char* buffer, size_t size)
 			totalBytesReceived += bytesReceived;
 		}
 		else if (bytesReceived == 0) {
-			// Connection closed gracefully by server
 			_connected = false;
 			throw std::runtime_error("Connection closed by server.");
 		}
 		else {
-			// Socket error
 			_connected = false;
 			throw std::runtime_error("Recv failed with error: " + std::to_string(WSAGetLastError()));
 		}
@@ -138,28 +125,21 @@ ServerResponse NetworkManager::receive_response()
 		throw std::runtime_error("Not connected to server.");
 	}
 
-	// 1. Read the fixed-size header (7 bytes)
 	char headerBuffer[sizeof(ResponseHeader)];
 	receive_exact(headerBuffer, sizeof(ResponseHeader));
 
-	// Reinterpret the buffer as our header struct
 	ResponseHeader* header = reinterpret_cast<ResponseHeader*>(headerBuffer);
 
-	// 2. Check payload size
 	if (header->payloadSize == 0) {
-		// No payload, just return the code and an empty string
 		return { header->code, "" };
 	}
 
-	if (header->payloadSize > 10 * 1024 * 1024) { // 10MB safety limit
+	if (header->payloadSize > 10 * 1024 * 1024) {
 		throw std::runtime_error("Server response payload too large.");
 	}
 
-	// 3. Read the exact payload size
-	// We use std::vector as a safe, resizable buffer
 	std::vector<char> payloadBuffer(header->payloadSize);
 	receive_exact(payloadBuffer.data(), header->payloadSize);
 
-	// Convert the payload buffer to a std::string and return
 	return { header->code, std::string(payloadBuffer.data(), payloadBuffer.size()) };
 }

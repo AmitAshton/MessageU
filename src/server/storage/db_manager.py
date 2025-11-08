@@ -43,7 +43,6 @@ class DatabaseManager:
             """)
             self.conn.commit()
 
-    # ---------- Client Management ----------
     def add_client(self, client: ClientRecord) -> None:
         with self._lock:
             try:

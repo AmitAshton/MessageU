@@ -6,7 +6,6 @@ from .enums import ResponseCode, ProtocolVersion
 class ResponseBuilder:
     @staticmethod
     def make_header(code: int, payload_size: int) -> bytes:
-        """Create only the header for a given response type"""
         header = ResponseHeader(ProtocolVersion.SERVER, code, payload_size)
         return header.to_bytes()
 
@@ -42,7 +41,6 @@ class ResponseBuilder:
 
     @staticmethod
     def build_pending_messages(payload: bytes) -> bytes:
-        """Used for 2104 - Pending messages"""
         header = ResponseHeader(ProtocolVersion.SERVER, ResponseCode.PENDING_MESSAGES, len(payload))
         return header.to_bytes() + payload
 
